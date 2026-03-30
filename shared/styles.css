@@ -64,8 +64,7 @@ body::before {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(10, 10, 15, 0.8);
-  backdrop-filter: blur(20px);
+  background: #0A0A0F;
   border-bottom: 1px solid var(--border);
   transition: all 0.3s ease;
 }
@@ -137,6 +136,9 @@ body::before {
 
 .navbar-links .btn-primary {
   margin-left: 0.5rem;
+  background: #00E5A0;
+  color: #0A0A0F;
+  font-weight: 700;
 }
 
 .hero {
