@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EV Recharge Bunk</title>
+  <link rel="stylesheet" href="shared/styles.css">
+  <style>
+    .hero {
+      text-align: center;
+      padding: 100px 20px;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      color: #00d4ff;
+    }
+    .hero p {
+      font-size: 1.2rem;
+      color: #aaa;
+      margin-bottom: 40px;
+    }
+    .portal-buttons {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .portal-btn {
+      padding: 30px 50px;
+      font-size: 1.3rem;
+      border-radius: 15px;
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+    .portal-btn.admin {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+    .portal-btn.user {
+      background: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
+      color: #1a1a2e;
+    }
+    .portal-btn:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <h1>⚡ EV Recharge Bunk</h1>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="admin/login.html">Admin</a>
+      <a href="user/login.html">User</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="hero">
+      <h1>Electric Vehicle Charging</h1>
+      <p>Find and book charging stations near you</p>
+      <div class="portal-links">
+        <a href="admin/login.html" class="portal-btn admin">Admin Portal</a>
+        <a href="user/login.html" class="portal-btn user">User Portal</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

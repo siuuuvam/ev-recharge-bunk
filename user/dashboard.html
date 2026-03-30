@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Dashboard - EV Recharge Bunk</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    #map {
+      height: 400px;
+      border-radius: 10px;
+    }
+    .bunk-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .bunk-card:hover {
+      background: rgba(0, 212, 255, 0.2);
+    }
+    .bunk-card.selected {
+      border: 2px solid #00d4ff;
+    }
+    .booking-details {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <h1>⚡ EV Recharge Bunk</h1>
+    <div class="nav-links">
+      <span id="userEmail"></span>
+      <a href="#" id="logoutBtn">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dashboard-grid">
+      <div>
+        <div class="card">
+          <h2>Find Nearby Charging Stations</h2>
+          <div id="map"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Available Bunks</h2>
+          <div id="bunksList">
+            <p class="loading">Loading nearby bunks...</p>
+          </div>
+        </div>
+
+        <div id="bunkDetails" class="card hidden">
+          <h2 id="selectedBunkName">Bunk Details</h2>
+          <p><strong>Address:</strong> <span id="selectedBunkAddress"></span></p>
+          <p><strong>Mobile:</strong> <span id="selectedBunkMobile"></span></p>
+          
+          <div class="booking-details">
+            <h3>Available Slots</h3>
+            <div id="availableSlots" class="slot-grid"></div>
+          </div>
+        </div>
+
+        <div id="bookingsList" class="card">
+          <h2>My Bookings</h2>
+          <div id="myBookings">
+            <p class="loading">Loading bookings...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db, Logger } from '../shared/utils.js';
+    import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { collection, addDoc, getDocs, updateDoc, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const logger = new Logger('UserDashboard');
+    let map, userLocation, markers = [];
+    let selectedBunkId = null;
+    let slotsUnsubscribe = null;
+    let bookingsUnsubscribe = null;
+
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const userData = userDoc.data();
+      
+      if (!userData || userData.role !== 'user') {
+        await signOut(auth);
+        window.location.href = 'login.html';
+        return;
+      }
+
+      document.getElementById('userEmail').textContent = userData.email;
+      logger.log('User dashboard loaded', { uid: user.uid, email: userData.email });
+      
+      initMap();
+      loadMyBookings(user.uid);
+    });
+
+    function initMap() {
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [0, 0],
+        zoom: 2
+      });
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            userLocation = [position.coords.longitude, position.coords.latitude];
+            map.flyTo({ center: userLocation, zoom: 12 });
+            
+            new mapboxgl.Marker({ color: '#00d4ff' })
+              .setLngLat(userLocation)
+              .setPopup(new mapboxgl.Popup().setText('Your Location'))
+              .addTo(map);
+
+            loadNearbyBunks(userLocation);
+          },
+          () => {
+            loadNearbyBunks(null);
+          }
+        );
+      } else {
+        loadNearbyBunks(null);
+      }
+
+      map.addControl(new mapboxgl.NavigationControl());
+    }
+
+    async function loadNearbyBunks(userLoc) {
+      const container = document.getElementById('bunksList');
+      container.innerHTML = '<p class="loading">Loading bunks...</p>';
+
+      markers.forEach(m => m.remove());
+      markers = [];
+
+      const snapshot = await getDocs(collection(db, 'bunks'));
+      container.innerHTML = '';
+
+      if (snapshot.empty) {
+        container.innerHTML = '<p>No charging stations found</p>';
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const bunk = doc.data();
+        
+        const popup = new mapboxgl.Popup()
+          .setHTML(`<strong>${bunk.name}</strong><br>${bunk.address}`);
+
+        const marker = new mapboxgl.Marker({ color: '#2ed573' })
+          .setLngLat([bunk.location.lng, bunk.location.lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        markers.push(marker);
+
+        const div = document.createElement('div');
+        div.className = 'bunk-card';
+        div.innerHTML = `
+          <h3>${bunk.name}</h3>
+          <p>${bunk.address}</p>
+          <p>📞 ${bunk.mobile}</p>
+        `;
+        div.addEventListener('click', () => selectBunk(doc.id, bunk, div));
+        container.appendChild(div);
+      });
+
+      if (userLoc) {
+        map.flyTo({ center: userLoc, zoom: 10 });
+      }
+    }
+
+    function selectBunk(bunkId, bunk, element) {
+      document.querySelectorAll('.bunk-card').forEach(c => c.classList.remove('selected'));
+      element.classList.add('selected');
+
+      selectedBunkId = bunkId;
+      document.getElementById('selectedBunkName').textContent = bunk.name;
+      document.getElementById('selectedBunkAddress').textContent = bunk.address;
+      document.getElementById('selectedBunkMobile').textContent = bunk.mobile;
+      document.getElementById('bunkDetails').classList.remove('hidden');
+
+      map.flyTo({ center: [bunk.location.lng, bunk.location.lat], zoom: 15 });
+
+      loadAvailableSlots(bunkId);
+    }
+
+    function loadAvailableSlots(bunkId) {
+      if (slotsUnsubscribe) slotsUnsubscribe();
+
+      const container = document.getElementById('availableSlots');
+      container.innerHTML = '<div class="loading">Loading slots...</div>';
+
+      const q = query(collection(db, 'slots'), where('bunkId', '==', bunkId));
+      slotsUnsubscribe = onSnapshot(q, (snapshot) => {
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+          container.innerHTML = '<p>No slots available</p>';
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const slot = doc.data();
+          const div = document.createElement('div');
+          
+          if (slot.isBooked) {
+            div.className = 'slot booked';
+            div.innerHTML = `
+              <strong>${slot.time}</strong>
+              <br><small>Booked</small>
+            `;
+          } else {
+            div.className = 'slot available';
+            div.innerHTML = `
+              <strong>${slot.time}</strong>
+              <br><small>Available</small>
+            `;
+            div.addEventListener('click', () => bookSlot(doc.id, slot.time));
+          }
+          
+          container.appendChild(div);
+        });
+      });
+    }
+
+    async function bookSlot(slotId, time) {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      if (!confirm(`Book slot at ${time}?`)) return;
+
+      try {
+        await updateDoc(doc(db, 'slots', slotId), {
+          isBooked: true,
+          bookedBy: user.uid,
+          bookedAt: new Date().toISOString()
+        });
+
+        await addDoc(collection(db, 'bookings'), {
+          slotId,
+          userId: user.uid,
+          bookedAt: new Date().toISOString(),
+          status: 'confirmed'
+        });
+
+        logger.log('Slot booked', { slotId, userId: user.uid });
+        alert('Slot booked successfully!');
+      } catch (error) {
+        alert('Error booking slot: ' + error.message);
+        logger.error('Booking failed', error);
+      }
+    }
+
+    function loadMyBookings(userId) {
+      if (bookingsUnsubscribe) bookingsUnsubscribe();
+
+      const container = document.getElementById('myBookings');
+      container.innerHTML = '<div class="loading">Loading bookings...</div>';
+
+      const q = query(collection(db, 'bookings'), where('userId', '==', userId));
+      bookingsUnsubscribe = onSnapshot(q, async (snapshot) => {
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+          container.innerHTML = '<p>No bookings yet</p>';
+          return;
+        }
+
+        for (const bookingDoc of snapshot.docs) {
+          const booking = bookingDoc.data();
+          const slotDoc = await db.collection('slots').doc(booking.slotId).get();
+          const slot = slotDoc.data();
+          const bunkDoc = await db.collection('bunks').doc(slot.bunkId).get();
+          const bunk = bunkDoc.data();
+
+          const div = document.createElement('div');
+          div.className = 'bunk-card';
+          div.innerHTML = `
+            <h3>${bunk.name}</h3>
+            <p>📍 ${bunk.address}</p>
+            <p>🕐 Slot: ${slot.time}</p>
+            <p>📅 Booked: ${new Date(booking.bookedAt).toLocaleDateString()}</p>
+            <span style="color: #2ed573;">Confirmed</span>
+          `;
+          container.appendChild(div);
+        }
+      });
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (slotsUnsubscribe) slotsUnsubscribe();
+      if (bookingsUnsubscribe) bookingsUnsubscribe();
+      await signOut(auth);
+      logger.log('User logged out');
+      window.location.href = 'login.html';
+    });
+  </script>
+</body>
+</html>

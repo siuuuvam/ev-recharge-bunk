@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - EV Recharge Bunk</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .tab-btn.active {
+      background: #00d4ff;
+      color: #1a1a2e;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <h1>⚡ Admin Dashboard</h1>
+    <div class="nav-links">
+      <span id="userEmail"></span>
+      <a href="#" id="logoutBtn">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="bunks">Manage Bunks</button>
+      <button class="tab-btn" data-tab="slots">Manage Slots</button>
+    </div>
+
+    <div id="bunks" class="tab-content active">
+      <div class="card">
+        <h2>Add New EV Bunk</h2>
+        <form id="addBunkForm">
+          <div class="form-group">
+            <label>Bunk Name</label>
+            <input type="text" id="bunkName" required placeholder="Enter bunk name">
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <textarea id="bunkAddress" required placeholder="Enter full address" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Mobile Number</label>
+            <input type="tel" id="bunkMobile" required placeholder="+1234567890">
+          </div>
+          <div class="form-group">
+            <label>Location (Click on map to select)</label>
+            <div id="map" style="height: 300px;"></div>
+            <input type="hidden" id="bunkLat">
+            <input type="hidden" id="bunkLng">
+          </div>
+          <button type="submit" class="btn btn-primary">Add Bunk</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>All Bunks</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Address</th>
+              <th>Mobile</th>
+              <th>Location</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="bunksTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="slots" class="tab-content">
+      <div class="card">
+        <h2>Manage Recharge Slots</h2>
+        <div class="form-group">
+          <label>Select Bunk</label>
+          <select id="selectBunk" required>
+            <option value="">Select a bunk</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Add Time Slot</label>
+          <div style="display: flex; gap: 10px;">
+            <input type="time" id="slotTime" required>
+            <button type="button" id="addSlotBtn" class="btn btn-success">Add Slot</button>
+          </div>
+        </div>
+        <div id="slotsList" class="slot-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db, Logger } from '../shared/utils.js';
+    import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const logger = new Logger('AdminDashboard');
+    let map, marker;
+
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const userData = userDoc.data();
+      
+      if (!userData || userData.role !== 'admin') {
+        await signOut(auth);
+        window.location.href = 'login.html';
+        return;
+      }
+
+      document.getElementById('userEmail').textContent = userData.email;
+      logger.log('Admin dashboard loaded', { uid: user.uid });
+      
+      initMap();
+      loadBunks();
+      loadBunksForSelect();
+    });
+
+    function initMap() {
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [0, 0],
+        zoom: 2
+      });
+
+      map.on('click', (e) => {
+        const { lng, lat } = e.lngLat;
+        document.getElementById('bunkLat').value = lat;
+        document.getElementById('bunkLng').value = lng;
+
+        if (marker) marker.remove();
+        marker = new mapboxgl.Marker()
+          .setLngLat([lng, lat])
+          .addTo(map);
+      });
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    document.getElementById('addBunkForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('bunkName').value;
+      const address = document.getElementById('bunkAddress').value;
+      const mobile = document.getElementById('bunkMobile').value;
+      const lat = parseFloat(document.getElementById('bunkLat').value);
+      const lng = parseFloat(document.getElementById('bunkLng').value);
+
+      if (!lat || !lng) {
+        alert('Please select a location on the map');
+        return;
+      }
+
+      try {
+        logger.log('Adding new bunk', { name, address });
+        await addDoc(collection(db, 'bunks'), {
+          name,
+          address,
+          mobile,
+          location: { lat, lng },
+          createdAt: new Date().toISOString()
+        });
+        
+        alert('Bunk added successfully!');
+        document.getElementById('addBunkForm').reset();
+        if (marker) marker.remove();
+        loadBunks();
+        loadBunksForSelect();
+      } catch (error) {
+        alert('Error adding bunk: ' + error.message);
+        logger.error('Failed to add bunk', error);
+      }
+    });
+
+    async function loadBunks() {
+      const tbody = document.getElementById('bunksTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+
+      const snapshot = await getDocs(collection(db, 'bunks'));
+      tbody.innerHTML = '';
+
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No bunks found</td></tr>';
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const bunk = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${bunk.name}</td>
+          <td>${bunk.address}</td>
+          <td>${bunk.mobile}</td>
+          <td>${bunk.location?.lat?.toFixed(4)}, ${bunk.location?.lng?.toFixed(4)}</td>
+          <td>
+            <button class="btn btn-danger" onclick="deleteBunk('${doc.id}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.deleteBunk = async function(id) {
+      if (!confirm('Are you sure you want to delete this bunk?')) return;
+      
+      try {
+        await deleteDoc(doc(db, 'bunks', id));
+        logger.log('Bunk deleted', { bunkId: id });
+        loadBunks();
+        loadBunksForSelect();
+      } catch (error) {
+        alert('Error deleting bunk: ' + error.message);
+        logger.error('Failed to delete bunk', error);
+      }
+    };
+
+    async function loadBunksForSelect() {
+      const select = document.getElementById('selectBunk');
+      select.innerHTML = '<option value="">Select a bunk</option>';
+
+      const snapshot = await getDocs(collection(db, 'bunks'));
+      snapshot.forEach(doc => {
+        const bunk = doc.data();
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = bunk.name;
+        select.appendChild(option);
+      });
+    }
+
+    document.getElementById('selectBunk').addEventListener('change', async (e) => {
+      const bunkId = e.target.value;
+      if (!bunkId) return;
+      loadSlots(bunkId);
+    });
+
+    let currentBunkId = null;
+    const slotsUnsubscribe = {};
+
+    function loadSlots(bunkId) {
+      if (slotsUnsubscribe[currentBunkId]) {
+        slotsUnsubscribe[currentBunkId]();
+      }
+      currentBunkId = bunkId;
+
+      const container = document.getElementById('slotsList');
+      container.innerHTML = '<div class="loading">Loading slots...</div>';
+
+      const q = query(collection(db, 'slots'), where('bunkId', '==', bunkId));
+      slotsUnsubscribe[bunkId] = onSnapshot(q, (snapshot) => {
+        container.innerHTML = '';
+        if (snapshot.empty) {
+          container.innerHTML = '<p>No slots available</p>';
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const slot = doc.data();
+          const div = document.createElement('div');
+          div.className = `slot ${slot.isBooked ? 'booked' : 'available'}`;
+          div.innerHTML = `
+            <strong>${slot.time}</strong>
+            <br><small>${slot.isBooked ? 'Booked' : 'Available'}</small>
+            ${!slot.isBooked ? `<br><button class="btn btn-danger" onclick="deleteSlot('${doc.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-top: 5px;">Delete</button>` : ''}
+          `;
+          container.appendChild(div);
+        });
+      });
+    }
+
+    document.getElementById('addSlotBtn').addEventListener('click', async () => {
+      const bunkId = document.getElementById('selectBunk').value;
+      const time = document.getElementById('slotTime').value;
+
+      if (!bunkId || !time) {
+        alert('Please select a bunk and time');
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, 'slots'), {
+          bunkId,
+          time,
+          isBooked: false,
+          bookedBy: null,
+          createdAt: new Date().toISOString()
+        });
+        
+        logger.log('Slot added', { bunkId, time });
+        document.getElementById('slotTime').value = '';
+      } catch (error) {
+        alert('Error adding slot: ' + error.message);
+        logger.error('Failed to add slot', error);
+      }
+    });
+
+    window.deleteSlot = async function(id) {
+      try {
+        await deleteDoc(doc(db, 'slots', id));
+        logger.log('Slot deleted', { slotId: id });
+      } catch (error) {
+        alert('Error deleting slot: ' + error.message);
+        logger.error('Failed to delete slot', error);
+      }
+    };
+
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await signOut(auth);
+      logger.log('Admin logged out');
+      window.location.href = 'login.html';
+    });
+  </script>
+</body>
+</html>
