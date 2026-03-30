@@ -3,69 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EV Recharge Bunk</title>
+  <title>EV Recharge Bunk | Electric Vehicle Charging</title>
+  <meta name="description" content="Find and book EV charging stations near you. Seamless charging experience for electric vehicle owners.">
   <link rel="stylesheet" href="shared/styles.css">
-  <style>
-    .hero {
-      text-align: center;
-      padding: 100px 20px;
-    }
-    .hero h1 {
-      font-size: 3rem;
-      margin-bottom: 20px;
-      color: #00d4ff;
-    }
-    .hero p {
-      font-size: 1.2rem;
-      color: #aaa;
-      margin-bottom: 40px;
-    }
-    .portal-buttons {
-      display: flex;
-      gap: 30px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .portal-btn {
-      padding: 30px 50px;
-      font-size: 1.3rem;
-      border-radius: 15px;
-      text-decoration: none;
-      transition: all 0.3s;
-    }
-    .portal-btn.admin {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-    }
-    .portal-btn.user {
-      background: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
-      color: #1a1a2e;
-    }
-    .portal-btn:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    }
-  </style>
 </head>
 <body>
   <nav class="navbar">
-    <h1>⚡ EV Recharge Bunk</h1>
-    <div class="nav-links">
-      <a href="index.html">Home</a>
-      <a href="admin/login.html">Admin</a>
-      <a href="user/login.html">User</a>
+    <a href="index.html" class="navbar-brand">
+      <div class="navbar-brand-icon">EV</div>
+      <span class="navbar-brand-text">Recharge Bunk</span>
+    </a>
+    <div class="navbar-links">
+      <a href="admin/login.html" class="btn-nav">Admin</a>
+      <a href="user/login.html" class="btn btn-primary">Get Started</a>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="hero">
-      <h1>Electric Vehicle Charging</h1>
-      <p>Find and book charging stations near you</p>
-      <div class="portal-links">
-        <a href="admin/login.html" class="portal-btn admin">Admin Portal</a>
-        <a href="user/login.html" class="portal-btn user">User Portal</a>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          Future of EV Charging
+        </div>
+        <h1 class="hero-title">
+          Charge Your <span class="hero-title-gradient">Electric Vehicle</span> Anywhere
+        </h1>
+        <p class="hero-description">
+          Discover nearby charging stations, book slots in advance, and enjoy seamless EV charging experience. Join the sustainable transportation revolution.
+        </p>
+        <div class="hero-actions">
+          <a href="user/register.html" class="btn btn-primary btn-lg">Find Charging Stations</a>
+          <a href="admin/register.html" class="btn btn-secondary btn-lg">Become a Partner</a>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <section class="dashboard-section">
+    <div class="container">
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Smart Location Finder</h3>
+          </div>
+          <p class="text-muted">Locate EV charging stations near you with real-time map integration. Get directions and view station details instantly.</p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Easy Slot Booking</h3>
+          </div>
+          <p class="text-muted">Book your charging slot in advance. No more waiting in queues. Reserve your time and charge with peace of mind.</p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Real-time Updates</h3>
+          </div>
+          <p class="text-muted">Get live updates on slot availability. Know when stations are busy or available. Stay informed always.</p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Admin Dashboard</h3>
+          </div>
+          <p class="text-muted">Station owners can easily manage their charging bunks, add slots, and monitor bookings from a powerful dashboard.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dashboard-section" style="padding-bottom: 4rem;">
+    <div class="container">
+      <div class="card text-center" style="max-width: 700px; margin: 0 auto;">
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.75rem; margin-bottom: 1rem;">Ready to Go?</h2>
+        <p class="text-muted" style="margin-bottom: 2rem;">Join thousands of EV owners who have switched to seamless charging. Sign up now and find your nearest charging station.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+          <a href="user/register.html" class="btn btn-primary btn-lg">Register as User</a>
+          <a href="admin/register.html" class="btn btn-secondary btn-lg">Register as Admin</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (window.scrollY > 50) {
+        navbar.classList.add('scrolled');
+      } else {
+        navbar.classList.remove('scrolled');
+      }
+    });
+  </script>
 </body>
 </html>

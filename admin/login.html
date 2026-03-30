@@ -8,24 +8,33 @@
 </head>
 <body>
   <div class="auth-container">
-    <div class="card">
-      <h1>Admin Login</h1>
+    <div class="auth-card">
+      <div class="auth-header">
+        <a href="../index.html" class="navbar-brand" style="justify-content: center; margin-bottom: 1.5rem;">
+          <div class="navbar-brand-icon">EV</div>
+          <span class="navbar-brand-text">Recharge Bunk</span>
+        </a>
+        <h1 class="auth-title">Welcome Back</h1>
+        <p class="auth-subtitle">Sign in to your admin account</p>
+      </div>
+      
       <form id="loginForm">
         <div class="form-group">
           <label>Email</label>
-          <input type="email" id="email" required placeholder="admin@example.com">
+          <input type="email" id="email" class="form-control" required placeholder="admin@example.com">
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="password" required placeholder="Enter password">
+          <input type="password" id="password" class="form-control" required placeholder="Enter your password">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Sign In</button>
       </form>
-      <p style="margin-top: 20px; color: #aaa;">
-        Don't have an account? <a href="register.html" style="color: #00d4ff;">Register</a>
+      
+      <p style="text-align: center; margin-top: 1.5rem; color: var(--text-secondary);">
+        Don't have an account? <a href="register.html" style="color: var(--primary); text-decoration: none;">Register</a>
       </p>
-      <p style="margin-top: 10px;">
-        <a href="../index.html" style="color: #aaa;">← Back to Home</a>
+      <p style="text-align: center; margin-top: 0.75rem;">
+        <a href="../index.html" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">Back to Home</a>
       </p>
     </div>
   </div>
@@ -33,6 +42,7 @@
   <script type="module">
     import { auth, db, Logger } from '../shared/utils.js';
     import { signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { ref, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
     const logger = new Logger('AdminLogin');
 
@@ -46,17 +56,17 @@
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        if (userData && userData.role === 'admin') {
-          logger.log('Admin login success', { uid: user.uid });
-          window.location.href = 'dashboard.html';
-        } else {
-          await auth.signOut();
-          alert('Access denied. Admin role required.');
-          logger.error('Unauthorized login attempt', { uid: user.uid });
-        }
+        onValue(ref(db, 'users/' + user.uid), (snapshot) => {
+          const userData = snapshot.val();
+          if (userData && userData.role === 'admin') {
+            logger.log('Admin login success', { uid: user.uid });
+            window.location.href = 'dashboard.html';
+          } else {
+            auth.signOut();
+            alert('Access denied. Admin role required.');
+            logger.error('Unauthorized login attempt', { uid: user.uid });
+          }
+        }, { onlyOnce: true });
       } catch (error) {
         alert('Login failed: ' + error.message);
         logger.error('Login failed', error);
